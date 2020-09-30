@@ -1,0 +1,5 @@
+Contents of b'file.txt'
+'this is file one'
+Contents of b'file2.txt'
+'this is file two'
+Contents of None
