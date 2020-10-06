@@ -1,9 +1,10 @@
 #! /usr/bin/env python3
 
-import sys
+import sys, os
+sys.path.append("../lib")       # for params
 import re, socket, params
-
-sys.path.append("../lib") # For params
+from framedSock import framedSend, framedReceive
+from os.path import exists
 
 switchesVarDefaults= (
     (('-l', '--listenPort'), 'listenPort', 50001),
@@ -23,40 +24,48 @@ bindAddr = ("127.0.0.1", listenPort)
 lsock.bind(bindAddr)
 lsock.listen(1)
 print("Listening on:", bindAddr)
-print("Waiting for connection...")
-
-sock, addr = lsock.accept()
-print(addr, "is connected to server.")
-
-from framedSock import framedSend, framedReceive
-
-####
-# open file to save data sent through files from the clients
-file = open("Server.txt","w")
 files_received = []
+
+# accept client requests all the time, create a subprocess for each client request
 while True:
-    # keep receiving files from the client
-    filename = framedReceive(sock, debug)
-    # add the file received to the list of received files
-    files_received.append(filename)
-    # write the name of the file to the server.txt
-    file.write("Contents of %s\n" % filename)
+    sock, addr = lsock.accept()
+    print("\n")
+    print(addr, "is connected to server.")
+    ####
+    try:
+        # open file to save data sent through files from the clients
+        file = open("Server.txt","w")
+        if not os.fork():
+            print("new child process handling this client request", addr)
 
-    # get payload from file comming from the client
-    payload = framedReceive(sock, debug)
-    if debug: print("rec'd: ", payload)
-    if not payload:
-        break
-    # write the contents of the file to the server.txt file on the server side
-    content = payload.decode("utf-8")
-    file.write("'%s'\n" % content)
-    # send to the client the contents of the file that the server received
-    framedSend(sock,payload,debug)
+            # keep receiving files from the client
+            filename = framedReceive(sock, debug)
+            if debug: print("rec'd: ", filename)
 
-print("Server received the following files")
-for x in files_received:
-    print(x)
-# close the server.txt file
-file.close()
+            # if server tries to send an empty file
+            if filename == None:
+                print("Client tried to send an empty or inexistent file!")
+
+            # if the file is already in the server, tell the client
+            if filename in files_received:
+                # send it to the client
+                print("Client tried to send a file that already exists")
+                # tell the client about the imaginary file
+                framedSend(sock, b"File already exists in server", debug)
+            else:
+                # add the file received to the list of received files, to check if the file has been sent before
+                files_received.append(filename)
+
+                # send to the client the name of the file that the server received
+                framedSend(sock,filename,debug)
+
+                print("Server received the following file")
+                print(filename)
+                print(files_received)
+        # close the server.txt file
+        file.close()
+    except:
+        print("Connection to the client lost")
+        sys.exit(0)
 # close the listener socket
 lsock.close()
