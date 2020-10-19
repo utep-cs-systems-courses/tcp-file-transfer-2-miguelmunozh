@@ -4,7 +4,7 @@ import socket, sys, re, os
 sys.path.append("../lib") # For params
 
 
-from framedSock import framedSend, framedReceive
+from encapFramedSock import EncapFramedSock
 
 
 addrFamily = socket.AF_INET
@@ -18,30 +18,33 @@ if s is None:
     sys.exit(1)
 
 s.connect(addrPort)
+fsock = EncapFramedSock((s, addrPort))
 
-# file passed as arguments
+
+
+
+# file passed as argument
 file = sys.argv[1]
 
 # check if the file exists
 if os.path.isfile(file) == False:
     print("The %s file doesnt exist" % file)
-    #framedSend(s, str.encode("imaginary file received"))
 
 # check if the file is empty
 elif os.path.getsize(file) <= 0:
     print("The file %s is empty!" % file)
 else:
-    print("\nSending File %s to Server:" % file)
-    framedSend(s, str.encode(file))
+    print("\nFile %s sent to Server" % file)
+    fsock.send(str.encode(file))
 
     # # open file to send content to server
-    # f  = open(file, "r")
-    # for line in f:
-    #     framedSend(s, str.encode(line))
-    #     # print contents received from the server
-    #     fr = framedReceive(s)
-    #     print("Server : ", fr)
-    # print("\n")
-    # f.close()
+    f  = open(file, "r")
+    for line in f:
+        fsock.send(str.encode(line))
+    print("\n")
+    f.close()
+    # get response from server
+    content = fsock.receive()
+    print(content)
 
 s.close()
